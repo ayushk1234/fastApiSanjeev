@@ -1,16 +1,39 @@
 from random import randrange
-
 from fastapi import FastAPI,Response,status,HTTPException
 import uvicorn
 from fastapi.params import  Body
 from pydantic import  BaseModel
+import mysql.connector
+# from  mysql import DictCursor;
+# import mysql.cursors;
 
+import time;
 app = FastAPI()
+
+
+while True:
+    try :
+        connection = mysql.connector.connect(host='localhost',
+                                             user='root',
+                                             password='Amala@2022',
+                                             database='fastApi'
+                                             )
+        # cursor = connection.cursor()
+        cursor = connection.cursor(dictionary=True)
+        print(" data connected")
+        break;
+    except Exception as error :
+        print( error)
+        time.sleep(2)
+
+
+
 
 class Post(BaseModel):
     title: str
     content: str
     # id : Optional['int']
+    published : int = 0
 
 my_post = [{
     "title" : "first post",
@@ -25,6 +48,7 @@ my_post = [{
 
 @app.get("/")
 async def root():
+
     return {"message": "hi"}
 
 @app.get("/newPage/{name}")
@@ -54,21 +78,33 @@ async def info(name:str,age:int):
 @app.get("/getPost")
 async def info():
     # print(name,age)
-    return {"data":my_post}
+    cursor.execute("SELECT * from posts")
+    posts = cursor.fetchall()
+    print(posts ," ayush")
+    return {"data":posts}
 
 @app.post("/createposts",status_code=status.HTTP_201_CREATED)
 async def create_posts(new_post: Post):
     new_post = new_post.dict()
-    new_post['id'] =randrange(0,100000)
-    my_post.append(new_post)
+    # new_post['id'] =randrange(0,100000)
+    query = "INSERT INTO posts (title ,content) VALUES ( %s, %s) RETURNING *  ;"
+    cursor.execute(query, (new_post['title'], new_post['content']))
+    new_post = cursor.fetchone()
+    # cursor.execute(query)
+    # my_post.append(new_post)
     # return {"name" : new_post['title'] }
+    connection.commit()
     return {"data" : new_post}
 
 @app.get("/getPost/{id}")
-async  def get_single_post(id:int):
-    # print(new_post.title)
-    # print(type(new_post))
-    result = find_post(int(id))
+async  def get_single_post(id:str):
+    tuple1 = (str(id),)
+    query = """SELECT * from posts WHERE id = %s ;"""
+    cursor.execute(query,tuple1)
+
+    result = cursor.fetchone()
+    # connection.commit()
+    # result = find_post(   int(id))
     if not result:
         # response.status_code =status.HTTP_404_NOT_FOUND;
         # return {"message" : f'post with {id} not found'}
@@ -105,6 +141,7 @@ async def updatePost(id : int,post:Post):
 
     return {"message" : post}
 
-
+# connection.commit()
 if __name__ == "__main__":
    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
+   # cursor.execute(query)
